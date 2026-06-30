@@ -1,21 +1,26 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>AI Assistant</title>
-  <style>
-    body { font-family: sans-serif; margin: 20px; }
-    textarea { width: 100%; height: 100px; }
-    button { margin-top: 10px; }
-    pre { white-space: pre-wrap; }
-  </style>
+<meta charset="UTF-8">
+<title>AI Assistant</title>
+<style>
+body { font-family: sans-serif; background:#f0f0f0; padding:20px; }
+#prompt { width:100%; padding:10px; }
+#output { margin-top:20px; white-space:pre-wrap; }
+button { padding:10px 20px; margin-top:10px; }
+</style>
 </head>
 <body>
-  <h2>AI Assistant</h2>
-  <textarea id="prompt" placeholder="Введите запрос..."></textarea>
-  <button onclick="send()">Отправить</button>
-  <pre id="output"></pre>
 
-  <script src="script.js"></script>
+<h2>AI Assistant</h2>
+
+<input id="prompt" type="text" placeholder="Введите запрос...">
+
+<!-- ВАЖНО: type="button" -->
+<button type="button" onclick="send()">Отправить</button>
+
+<div id="output"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
