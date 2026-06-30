@@ -1,26 +1,247 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <title>AI Assistant</title>
+
+<!-- Адаптивность для старых устройств -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="HandheldFriendly" content="true">
+<meta name="MobileOptimized" content="320">
 <style>
-body { font-family: sans-serif; background:#f0f0f0; padding:20px; }
-#prompt { width:100%; padding:10px; }
-#output { margin-top:20px; white-space:pre-wrap; }
-button { padding:10px 20px; margin-top:10px; }
+/* Базовый reset и совместимость */
+* { box-sizing: border-box; -webkit-box-sizing: border-box; -moz-box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: #f2f2f2; color: #222; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+
+/* Контейнер */
+.container {
+  width: 94%;
+  max-width: 760px;
+  margin: 12px auto;
+  padding: 12px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 rgba(0,0,0,0);
+}
+
+/* Заголовок */
+h2 { margin: 0 0 10px 0; font-size: 18px; }
+
+/* Поля и кнопки */
+#prompt { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 3px; }
+button[type="button"] { display: inline-block; padding: 10px 14px; font-size: 16px; cursor: pointer; border: 1px solid #2b7cff; background: #2b7cff; color: #fff; border-radius: 3px; }
+
+/* Вывод */
+#output { margin-top: 12px; white-space: pre-wrap; font-size: 15px; min-height: 40px; }
+
+/* Простая двухколоночная раскладка (fallback на блоки) */
+.row { width: 100%; overflow: hidden; }
+.col { float: left; width: 48%; margin-right: 4%; }
+.col:last-child { margin-right: 0; }
+
+/* Изображения и медиа */
+img { max-width: 100%; height: auto; }
+
+/* Медиа‑запросы для узких экранов */
+@media only screen and (max-width: 480px) {
+  .container { padding: 10px; }
+  .col { float: none; width: 100%; margin-right: 0; margin-bottom: 10px; }
+  button[type="button"] { width: 100%; box-sizing: border-box; }
+  #prompt { font-size: 15px; padding: 9px; }
+  #output { font-size: 14px; }
+}
+
+/* Специальные правила для JS fallback класса */
+html.narrow .container { width: 96%; padding: 8px; }
+html.narrow button[type="button"] { font-size: 15px; padding: 10px; }
 </style>
 </head>
 <body>
 
-<h2>AI Assistant</h2>
+<div class="container">
+  <h2>AI Assistant</h2>
 
-<input id="prompt" type="text" placeholder="Введите запрос...">
+  <div class="row">
+    <div class="col">
+      <input id="prompt" type="text" placeholder="Введите запрос..." />
+    </div>
+    <div class="col">
+      <!-- ВАЖНО: type="button" -->
+      <button type="button" id="sendBtn">Отправить</button>
+    </div>
+  </div>
 
-<!-- ВАЖНО: type="button" -->
-<button type="button" onclick="send()">Отправить</button>
+  <div id="output"></div>
+</div>
 
-<div id="output"></div>
+<script>
+/* Responsive JS fallback для старых браузеров */
+(function(){
+  function applyResponsiveClass() {
+    var w = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+    var cls = document.documentElement.className || "";
+    if (w <= 480) {
+      if (cls.indexOf("narrow") === -1) {
+        document.documentElement.className = (cls + " narrow").replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'');
+      }
+    } else {
+      document.documentElement.className = cls.replace(/\bnarrow\b/,'').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'');
+    }
+  }
+  applyResponsiveClass();
+  if (window.addEventListener) {
+    window.addEventListener('resize', applyResponsiveClass, false);
+  } else if (window.attachEvent) {
+    window.attachEvent('onresize', applyResponsiveClass);
+  }
+})();
 
-<script src="script.js"></script>
+/* Основная логика отправки: fetch с XHR fallback, блокировка кнопки, таймаут */
+(function(){
+  var btn = document.getElementById('sendBtn');
+  var input = document.getElementById('prompt');
+  var output = document.getElementById('output');
+  var WORKER_URL = "https://ai-assistant.animaximus64.workers.dev";
+  var XHR_TIMEOUT = 15000; // ms
+
+  function setOutput(text) {
+    try {
+      output.textContent = text;
+    } catch (e) {
+      output.innerText = text; // старые IE
+    }
+  }
+
+  function enableButton() {
+    try { btn.disabled = false; } catch(e){}
+  }
+  function disableButton() {
+    try { btn.disabled = true; } catch(e){}
+  }
+
+  function xhrFallback(payload) {
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", WORKER_URL, true);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.timeout = XHR_TIMEOUT;
+
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState !== 4) return;
+        enableButton();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            var reply = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || xhr.responseText;
+            setOutput(reply);
+          } catch (e) {
+            setOutput(xhr.responseText);
+          }
+        } else {
+          setOutput("Ошибка: " + xhr.status + " " + xhr.statusText);
+        }
+      };
+
+      xhr.ontimeout = function() {
+        enableButton();
+        setOutput("Таймаут запроса. Попробуйте ещё раз.");
+      };
+
+      xhr.onerror = function() {
+        enableButton();
+        setOutput("Сетевая ошибка при обращении к Worker");
+      };
+
+      xhr.send(payload);
+    } catch (e) {
+      enableButton();
+      setOutput("Браузер не поддерживает отправку запросов");
+    }
+  }
+
+  function sendRequest() {
+    var prompt = (input.value || "").replace(/^\s+|\s+$/g,'');
+    if (!prompt) {
+      setOutput("Введите запрос.");
+      return;
+    }
+
+    disableButton();
+    setOutput("⏳ Отправка запроса...");
+
+    var payload = JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
+
+    // Попытка fetch, если доступен
+    if (typeof fetch === "function") {
+      try {
+        fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          mode: "cors"
+        })
+        .then(function(res) {
+          if (!res || !res.ok) {
+            throw new Error("Network response was not ok: " + (res && res.status));
+          }
+          return res.json();
+        })
+        .then(function(data) {
+          enableButton();
+          try {
+            var reply = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || JSON.stringify(data);
+            setOutput(reply);
+          } catch (e) {
+            setOutput(JSON.stringify(data));
+          }
+        })
+        .catch(function(err) {
+          // fallback to XHR on any fetch error (TLS, CORS, etc.)
+          console && console.log && console.log("fetch failed, fallback to XHR:", err);
+          xhrFallback(payload);
+        });
+        return;
+      } catch (e) {
+        console && console.log && console.log("fetch threw, using XHR fallback:", e);
+      }
+    }
+
+    // Если fetch нет или упал — XHR
+    xhrFallback(payload);
+  }
+
+  // Привязка события
+  if (btn.addEventListener) {
+    btn.addEventListener('click', sendRequest, false);
+  } else if (btn.attachEvent) {
+    btn.attachEvent('onclick', sendRequest);
+  } else {
+    btn.onclick = sendRequest;
+  }
+
+  // Отправка по Enter в поле (старые браузеры)
+  if (input.addEventListener) {
+    input.addEventListener('keydown', function(e) {
+      e = e || window.event;
+      var key = e.keyCode || e.which;
+      if (key === 13) { // Enter
+        if (e.preventDefault) e.preventDefault();
+        sendRequest();
+      }
+    }, false);
+  } else if (input.attachEvent) {
+    input.attachEvent('onkeydown', function(e) {
+      e = e || window.event;
+      var key = e.keyCode || e.which;
+      if (key === 13) {
+        sendRequest();
+      }
+    });
+  }
+})();
+</script>
 </body>
 </html>
